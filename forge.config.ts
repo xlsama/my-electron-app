@@ -16,7 +16,6 @@ const config: ForgeConfig = {
           owner: "xlsama",
           name: "my-electron-app",
         },
-        prerelease: true,
         authToken: process.env.GITHUB_TOKEN,
       },
     },

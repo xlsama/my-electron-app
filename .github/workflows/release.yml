@@ -1,0 +1,98 @@
+name: build-and-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (e.g. v1.2.0)"
+        required: true
+        type: string
+      release_name:
+        description: "Release title"
+        required: false
+        type: string
+      prerelease:
+        description: "Mark as prerelease"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.display_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            display_name: macOS
+            artifact_name: macos-artifacts
+            artifact_paths: |
+              out/make/**/*.zip
+          - os: windows-latest
+            display_name: Windows
+            artifact_name: windows-artifacts
+            artifact_paths: |
+              out/make/**/*.exe
+              out/make/**/*.nupkg
+              out/make/**/*.RELEASES
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build platform package
+        run: pnpm make
+
+      - name: List build artifacts
+        run: |
+          echo "Artifacts in out/make:" 
+          ls -R out/make
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_paths }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Display downloaded files
+        run: ls -R
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            macos-artifacts/**
+            windows-artifacts/**
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: ${{ github.event.inputs.release_name }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          target_commitish: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
