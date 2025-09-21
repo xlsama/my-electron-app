@@ -655,24 +655,15 @@ const duplicateGroup = (index: number) => {
         </template>
 
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField
-            label="是否禁用日志"
-            description="关闭后不会输出任何日志。"
-          >
+          <UFormField label="是否禁用日志">
             <USwitch v-model="state.log.disabled" />
           </UFormField>
 
-          <UFormField
-            label="日志级别"
-            description="用于控制输出的日志详细程度。"
-          >
+          <UFormField label="日志级别">
             <USelect v-model="state.log.level" :items="logLevelOptions" />
           </UFormField>
 
-          <UFormField
-            label="输出方式"
-            description="选择在控制台或文件中输出日志。"
-          >
+          <UFormField label="输出方式">
             <USelect v-model="state.log.type" :items="logTypeOptions" />
           </UFormField>
         </div>
@@ -693,11 +684,7 @@ const duplicateGroup = (index: number) => {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField
-                label="倒计时范围（秒）"
-                description="仅在该范围内的福袋会被抢。"
-                class="md:col-span-2"
-              >
+              <UFormField label="倒计时范围（秒）" class="md:col-span-2">
                 <div class="flex items-center gap-2">
                   <UInput
                     v-model="state.lottery.conditions.countdownRange.start"
@@ -717,10 +704,7 @@ const duplicateGroup = (index: number) => {
                 </div>
               </UFormField>
 
-              <UFormField
-                label="最大观众数"
-                description="超过该人数的直播间将被跳过。"
-              >
+              <UFormField label="最大观众数">
                 <UInput
                   v-model="state.lottery.conditions.maxViewers"
                   type="number"
@@ -729,10 +713,7 @@ const duplicateGroup = (index: number) => {
                 />
               </UFormField>
 
-              <UFormField
-                label="最低中奖概率 (%)"
-                description="小于该概率的福袋将被跳过（0-100）。"
-              >
+              <UFormField label="最低中奖概率 (%)">
                 <UInput
                   v-model="state.lottery.conditions.minProbability"
                   type="number"
@@ -753,10 +734,7 @@ const duplicateGroup = (index: number) => {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField
-                label="策略切换阈值 (次)"
-                description="达到次数后切换账号或策略，留空表示不限次数。"
-              >
+              <UFormField label="策略切换阈值 (次)">
                 <UInput
                   v-model="state.lottery.switchThreshold"
                   type="number"
@@ -765,10 +743,7 @@ const duplicateGroup = (index: number) => {
                 />
               </UFormField>
 
-              <UFormField
-                label="粉丝团福袋参与"
-                description="开启后会抢粉丝团限定福袋。"
-              >
+              <UFormField label="粉丝团福袋参与">
                 <USwitch v-model="state.lottery.fanClub" />
               </UFormField>
             </div>
@@ -781,11 +756,7 @@ const duplicateGroup = (index: number) => {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField
-                label="抢袋后停留时间 (秒)"
-                description="抢到福袋后需停留的时间范围。"
-                class="md:col-span-2"
-              >
+              <UFormField label="抢袋后停留时间 (秒)" class="md:col-span-2">
                 <div class="flex items-center gap-2">
                   <UInput
                     v-model="state.lottery.postStay.start"
@@ -865,17 +836,11 @@ const duplicateGroup = (index: number) => {
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
-                <UFormField
-                  label="分组 ID"
-                  description="唯一标识，建议使用 UUID。"
-                >
+                <UFormField label="分组 ID">
                   <UInput v-model="group.id" placeholder="例如 4028808b..." />
                 </UFormField>
 
-                <UFormField
-                  label="线程数"
-                  description="并发执行线程数，需为正整数。"
-                >
+                <UFormField label="线程数">
                   <UInput
                     v-model="group.threads"
                     type="number"
@@ -884,10 +849,7 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField
-                  label="继承全局抽奖配置"
-                  description="开启后沿用全局抽奖设置；关闭则完全自定义。"
-                >
+                <UFormField label="继承全局抽奖配置">
                   <USwitch v-model="group.inherit" />
                 </UFormField>
               </div>
@@ -904,11 +866,7 @@ const duplicateGroup = (index: number) => {
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
-                <UFormField
-                  label="倒计时范围（秒）"
-                  description="仅当同时填写最小值与最大值时才会覆盖全局设置。"
-                  class="md:col-span-2"
-                >
+                <UFormField label="倒计时范围（秒）" class="md:col-span-2">
                   <div class="flex items-center gap-2">
                     <UInput
                       v-model="group.lottery.conditions.countdownRange.start"
@@ -928,10 +886,7 @@ const duplicateGroup = (index: number) => {
                   </div>
                 </UFormField>
 
-                <UFormField
-                  label="最大观众数"
-                  description="留空表示继承全局最大观众数。"
-                >
+                <UFormField label="最大观众数">
                   <UInput
                     v-model="group.lottery.conditions.maxViewers"
                     type="number"
@@ -940,10 +895,7 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField
-                  label="最低中奖概率 (%)"
-                  description="留空表示继承全局设置。"
-                >
+                <UFormField label="最低中奖概率 (%)">
                   <UInput
                     v-model="group.lottery.conditions.minProbability"
                     type="number"
@@ -953,10 +905,7 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField
-                  label="策略切换阈值 (次)"
-                  description="留空表示继承全局阈值。"
-                >
+                <UFormField label="策略切换阈值 (次)">
                   <UInput
                     v-model="group.lottery.switchThreshold"
                     type="number"
@@ -965,21 +914,14 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField
-                  label="粉丝团福袋参与"
-                  description="可选择继承、仅此分组参与或不参与粉丝团福袋。"
-                >
+                <UFormField label="粉丝团福袋参与">
                   <USelect
                     v-model="group.lottery.fanClub"
                     :items="groupFanClubOptions"
                   />
                 </UFormField>
 
-                <UFormField
-                  label="抢袋后停留时间 (秒)"
-                  description="同时填写最短与最长停留秒数才会覆盖全局设置。"
-                  class="md:col-span-2"
-                >
+                <UFormField label="抢袋后停留时间 (秒)" class="md:col-span-2">
                   <div class="flex items-center gap-2">
                     <UInput
                       v-model="group.lottery.postStay.start"
@@ -1020,10 +962,7 @@ const duplicateGroup = (index: number) => {
           </div>
         </template>
 
-        <UFormField
-          label="Redis 连接地址"
-          description="格式：redis://host:port/db"
-        >
+        <UFormField label="Redis 连接地址">
           <UInput
             v-model="state.redis.url"
             placeholder="redis://127.0.0.1:6379/0"
@@ -1035,7 +974,7 @@ const duplicateGroup = (index: number) => {
     <AnimatePresence :initial="false">
       <motion.div
         v-if="showPreview"
-        class="flex flex-col gap-3 lg:sticky flex-1"
+        class="flex flex-col gap-3 flex-1 sticky top-0"
         :initial="{ opacity: 0, x: 50 }"
         :animate="{ opacity: 1, x: 0 }"
       >
@@ -1066,7 +1005,7 @@ const duplicateGroup = (index: number) => {
               </UButton>
             </div>
             <pre
-              class="max-h-96 overflow-auto rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
+              class="rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
               >{{ yamlPreview }}
           </pre
             >
