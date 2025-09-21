@@ -1,6 +1,63 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import type { IpcMainInvokeEvent } from "electron";
 import path from "node:path";
+import { writeFile } from "node:fs/promises";
 import started from "electron-squirrel-startup";
+import type {
+  ConfigExportPayload,
+  ConfigExportResult,
+} from "./types/config-exporter";
+
+const exportChannel = "config:export";
+
+const handleConfigExport = async (
+  event: IpcMainInvokeEvent,
+  payload: ConfigExportPayload
+): Promise<ConfigExportResult> => {
+  if (!payload || typeof payload.content !== "string") {
+    return {
+      canceled: false,
+      error: "导出内容缺失",
+    };
+  }
+
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+
+  try {
+    const defaultPath = payload.defaultPath?.trim() || "lottery-config.yaml";
+    const options = {
+      title: "导出配置",
+      defaultPath,
+      filters: [
+        { name: "YAML 文件", extensions: ["yaml", "yml"] },
+        { name: "所有文件", extensions: ["*"] },
+      ],
+    };
+
+    const result = senderWindow
+      ? await dialog.showSaveDialog(senderWindow, options)
+      : await dialog.showSaveDialog(options);
+
+    if (result.canceled || !result.filePath) {
+      return { canceled: true };
+    }
+
+    await writeFile(result.filePath, payload.content, "utf-8");
+
+    return {
+      canceled: false,
+      filePath: result.filePath,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      canceled: false,
+      error: message,
+    };
+  }
+};
+
+ipcMain.handle(exportChannel, handleConfigExport);
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {

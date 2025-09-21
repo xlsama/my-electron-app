@@ -11,7 +11,7 @@ import { motion } from "motion-v";
         :key="$route.fullPath"
         :initial="{ opacity: 0 }"
         :animate="{ opacity: 1 }"
-        class="min-w-0 flex-1 p-5 bg-muted overflow-y-auto"
+        class="min-w-0 flex-1 p-5 bg-slate-50 overflow-y-auto"
       >
         <RouterView />
       </motion.div>
