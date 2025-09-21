@@ -275,9 +275,9 @@ const logTypeOptions = [
 ];
 
 const groupFanClubOptions = [
-  { label: "继承全局配置", value: "inherit" },
-  { label: "仅此分组参与", value: "true" },
-  { label: "仅此分组不参与", value: "false" },
+  { label: "继承全局设置", value: "inherit" },
+  { label: "仅此分组参与粉丝团福袋", value: "true" },
+  { label: "仅此分组排除粉丝团福袋", value: "false" },
 ];
 
 const state = reactive<PageSchema>({
@@ -623,350 +623,450 @@ const duplicateGroup = (index: number) => {
           placement="bottom"
         >
           <UButton
-            size="sm"
             variant="ghost"
             color="neutral"
-            :icon="showPreview ? 'i-lucide-sidebar-close' : 'i-lucide-sidebar-open'"
+            :icon="
+              showPreview ? 'i-lucide-sidebar-close' : 'i-lucide-sidebar-open'
+            "
             @click="showPreview = !showPreview"
           />
         </UTooltip>
       </div>
 
-    <UAlert
-      v-if="validationMessages.length > 0"
-      title="请先修正以下问题"
-      color="error"
-      variant="subtle"
-    >
-      <ul class="list-disc space-y-1 pl-5 text-sm">
-        <li v-for="message in validationMessages" :key="message">
-          {{ message }}
-        </li>
-      </ul>
-    </UAlert>
-
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-medium">日志配置</h2>
-        </div>
-      </template>
-
-      <div class="grid gap-4 md:grid-cols-2">
-        <UFormGroup label="是否禁用日志" description="关闭后不会输出任何日志。">
-          <USwitch v-model="state.log.disabled" />
-        </UFormGroup>
-
-        <UFormGroup label="日志级别">
-          <USelect v-model="state.log.level" :options="logLevelOptions" />
-        </UFormGroup>
-
-        <UFormGroup label="输出方式">
-          <USelect v-model="state.log.type" :options="logTypeOptions" />
-        </UFormGroup>
-      </div>
-    </UCard>
-
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-medium">全局抽奖配置</h2>
-        </div>
-      </template>
-
-      <div class="grid gap-4 md:grid-cols-2">
-        <UFormGroup
-          label="倒计时范围（秒）"
-          description="仅在该范围内的福袋会被抢。"
-        >
-          <div class="flex items-center gap-2">
-            <UInput
-              v-model="state.lottery.conditions.countdownRange.start"
-              type="number"
-              placeholder="最小值"
-              min="0"
-            />
-            <span class="text-sm text-gray-400">至</span>
-            <UInput
-              v-model="state.lottery.conditions.countdownRange.end"
-              type="number"
-              placeholder="最大值"
-              min="0"
-            />
-          </div>
-        </UFormGroup>
-
-        <UFormGroup label="最大观众数">
-          <UInput
-            v-model="state.lottery.conditions.maxViewers"
-            type="number"
-            placeholder="例如：5000"
-            min="0"
-          />
-        </UFormGroup>
-
-        <UFormGroup
-          label="最低中奖概率 (%)"
-          description="小于该概率将跳过福袋。"
-        >
-          <UInput
-            v-model="state.lottery.conditions.minProbability"
-            type="number"
-            placeholder="0 - 100"
-            min="0"
-            max="100"
-          />
-        </UFormGroup>
-
-        <UFormGroup
-          label="策略切换阈值"
-          description="达到次数后更换账号或策略。"
-        >
-          <UInput
-            v-model="state.lottery.switchThreshold"
-            type="number"
-            placeholder="可选"
-            min="0"
-          />
-        </UFormGroup>
-
-        <UFormGroup label="是否参与粉丝团抽奖">
-          <USwitch v-model="state.lottery.fanClub" />
-        </UFormGroup>
-
-        <UFormGroup
-          label="停留时间范围（秒）"
-          description="抢到福袋后的停留时长。"
-        >
-          <div class="flex items-center gap-2">
-            <UInput
-              v-model="state.lottery.postStay.start"
-              type="number"
-              placeholder="最短"
-              min="0"
-            />
-            <span class="text-sm text-gray-400">至</span>
-            <UInput
-              v-model="state.lottery.postStay.end"
-              type="number"
-              placeholder="最长"
-              min="0"
-            />
-          </div>
-        </UFormGroup>
-      </div>
-    </UCard>
-
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-medium">分组配置</h2>
-        </div>
-      </template>
-
-      <div class="space-y-4">
-        <div
-          v-if="state.bitBrowser.groups.length === 0"
-          class="text-sm text-gray-500"
-        >
-          暂无分组，请点击下方按钮新增。
-        </div>
-
-        <div
-          v-for="(group, index) in state.bitBrowser.groups"
-          :key="`${group.id || 'new'}-${index}`"
-          class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex flex-col">
-              <span class="text-sm font-medium">分组 {{ index + 1 }}</span>
-              <span class="text-xs text-gray-500">唯一 ID 与并发线程</span>
-            </div>
-            <div class="flex gap-2">
-              <UTooltip text="复制分组" placement="top">
-                <UButton
-                  size="xs"
-                  color="neutral"
-                  variant="ghost"
-                  icon="i-heroicons-document-duplicate"
-                  @click="duplicateGroup(index)"
-                />
-              </UTooltip>
-              <UTooltip text="删除分组" placement="top">
-                <UButton
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-heroicons-trash"
-                  @click="removeGroup(index)"
-                />
-              </UTooltip>
-            </div>
-          </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <UFormGroup label="分组 ID" description="唯一标识，建议使用 UUID。">
-              <UInput v-model="group.id" placeholder="例如：4028808b..." />
-            </UFormGroup>
-
-            <UFormGroup label="线程数">
-              <UInput
-                v-model="group.threads"
-                type="number"
-                min="1"
-                placeholder="正整数"
-              />
-            </UFormGroup>
-
-            <UFormGroup label="是否继承全局配置">
-              <USwitch v-model="group.inherit" />
-            </UFormGroup>
-          </div>
-
-          <UDivider label="分组抽奖配置覆盖（可选）" />
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <UFormGroup label="倒计时范围（秒）">
-              <div class="flex items-center gap-2">
-                <UInput
-                  v-model="group.lottery.conditions.countdownRange.start"
-                  type="number"
-                  placeholder="最小值"
-                  min="0"
-                />
-                <span class="text-sm text-gray-400">至</span>
-                <UInput
-                  v-model="group.lottery.conditions.countdownRange.end"
-                  type="number"
-                  placeholder="最大值"
-                  min="0"
-                />
-              </div>
-            </UFormGroup>
-
-            <UFormGroup label="最大观众数">
-              <UInput
-                v-model="group.lottery.conditions.maxViewers"
-                type="number"
-                placeholder="留空表示继承"
-                min="0"
-              />
-            </UFormGroup>
-
-            <UFormGroup label="最低中奖概率 (%)">
-              <UInput
-                v-model="group.lottery.conditions.minProbability"
-                type="number"
-                placeholder="留空表示继承"
-                min="0"
-                max="100"
-              />
-            </UFormGroup>
-
-            <UFormGroup label="策略切换阈值">
-              <UInput
-                v-model="group.lottery.switchThreshold"
-                type="number"
-                placeholder="留空表示继承"
-                min="0"
-              />
-            </UFormGroup>
-
-            <UFormGroup label="是否参与粉丝团抽奖">
-              <USelect
-                v-model="group.lottery.fanClub"
-                :options="groupFanClubOptions"
-              />
-            </UFormGroup>
-
-            <UFormGroup label="停留时间范围（秒）">
-              <div class="flex items-center gap-2">
-                <UInput
-                  v-model="group.lottery.postStay.start"
-                  type="number"
-                  placeholder="最短"
-                  min="0"
-                />
-                <span class="text-sm text-gray-400">至</span>
-                <UInput
-                  v-model="group.lottery.postStay.end"
-                  type="number"
-                  placeholder="最长"
-                  min="0"
-                />
-              </div>
-            </UFormGroup>
-          </div>
-        </div>
-
-        <div class="flex justify-end">
-          <UButton
-            icon="i-heroicons-plus-circle"
-            variant="ghost"
-            @click="addGroup"
-            >新增分组</UButton
-          >
-        </div>
-      </div>
-    </UCard>
-
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-medium">Redis 配置</h2>
-        </div>
-      </template>
-
-      <UFormGroup
-        label="Redis 连接地址"
-        description="格式：redis://host:port/db"
+      <UAlert
+        v-if="validationMessages.length > 0"
+        title="请先修正以下问题"
+        color="error"
+        variant="subtle"
       >
-        <UInput
-          v-model="state.redis.url"
-          placeholder="redis://127.0.0.1:6379/0"
-        />
-      </UFormGroup>
-    </UCard>
-  </div>
+        <ul class="list-disc space-y-1 pl-5 text-sm">
+          <li v-for="message in validationMessages" :key="message">
+            {{ message }}
+          </li>
+        </ul>
+      </UAlert>
 
-  <div
-    v-if="showPreview"
-    class="flex flex-col gap-3 lg:sticky lg:top-5 lg:min-w-[320px] lg:w-[360px]"
-  >
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-medium">YAML 预览</h2>
-        </div>
-      </template>
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-medium">日志配置</h2>
+          </div>
+        </template>
 
-      <div class="space-y-3">
-        <div class="flex gap-3">
-          <UButton
-            icon="i-heroicons-document-duplicate"
-            :disabled="validationMessages.length > 0"
-            @click="handleCopyYaml"
+        <div class="grid gap-4 md:grid-cols-2">
+          <UFormField
+            label="是否禁用日志"
+            description="关闭后不会输出任何日志。"
           >
-            复制 YAML
-          </UButton>
-          <UButton
-            icon="i-heroicons-arrow-down-tray"
-            color="primary"
-            :disabled="validationMessages.length > 0 || isExporting"
-            :loading="isExporting"
-            @click="handleExport"
+            <USwitch v-model="state.log.disabled" />
+          </UFormField>
+
+          <UFormField
+            label="日志级别"
+            description="用于控制输出的日志详细程度。"
           >
-            导出文件
-          </UButton>
+            <USelect v-model="state.log.level" :items="logLevelOptions" />
+          </UFormField>
+
+          <UFormField
+            label="输出方式"
+            description="选择在控制台或文件中输出日志。"
+          >
+            <USelect v-model="state.log.type" :items="logTypeOptions" />
+          </UFormField>
         </div>
-        <pre
-          class="max-h-96 overflow-auto rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
-          >{{ yamlPreview }}
-          </pre
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-medium">全局抽奖配置</h2>
+          </div>
+        </template>
+
+        <div class="space-y-6">
+          <section class="space-y-3">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700">基础过滤条件</h3>
+              <p class="text-xs text-gray-500">YAML 节点：lottery.conditions</p>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField
+                label="倒计时范围（秒）"
+                description="仅在该范围内的福袋会被抢。"
+                class="md:col-span-2"
+              >
+                <div class="flex items-center gap-2">
+                  <UInput
+                    v-model="state.lottery.conditions.countdownRange.start"
+                    type="number"
+                    placeholder="最小秒数"
+                    min="0"
+                    aria-label="倒计时最小值"
+                  />
+                  <span class="text-sm text-gray-400">至</span>
+                  <UInput
+                    v-model="state.lottery.conditions.countdownRange.end"
+                    type="number"
+                    placeholder="最大秒数"
+                    min="0"
+                    aria-label="倒计时最大值"
+                  />
+                </div>
+              </UFormField>
+
+              <UFormField
+                label="最大观众数"
+                description="超过该人数的直播间将被跳过。"
+              >
+                <UInput
+                  v-model="state.lottery.conditions.maxViewers"
+                  type="number"
+                  placeholder="例如 5000"
+                  min="0"
+                />
+              </UFormField>
+
+              <UFormField
+                label="最低中奖概率 (%)"
+                description="小于该概率的福袋将被跳过（0-100）。"
+              >
+                <UInput
+                  v-model="state.lottery.conditions.minProbability"
+                  type="number"
+                  placeholder="0 - 100"
+                  min="0"
+                  max="100"
+                />
+              </UFormField>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700">策略控制</h3>
+              <p class="text-xs text-gray-500">
+                YAML 节点：lottery.switch_threshold, lottery.fan_club
+              </p>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField
+                label="策略切换阈值 (次)"
+                description="达到次数后切换账号或策略，留空表示不限次数。"
+              >
+                <UInput
+                  v-model="state.lottery.switchThreshold"
+                  type="number"
+                  placeholder="留空表示不限次数"
+                  min="0"
+                />
+              </UFormField>
+
+              <UFormField
+                label="粉丝团福袋参与"
+                description="开启后会抢粉丝团限定福袋。"
+              >
+                <USwitch v-model="state.lottery.fanClub" />
+              </UFormField>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700">停留策略</h3>
+              <p class="text-xs text-gray-500">YAML 节点：lottery.post_stay</p>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField
+                label="抢袋后停留时间 (秒)"
+                description="抢到福袋后需停留的时间范围。"
+                class="md:col-span-2"
+              >
+                <div class="flex items-center gap-2">
+                  <UInput
+                    v-model="state.lottery.postStay.start"
+                    type="number"
+                    placeholder="最短停留"
+                    min="0"
+                    aria-label="停留时间最短"
+                  />
+                  <span class="text-sm text-gray-400">至</span>
+                  <UInput
+                    v-model="state.lottery.postStay.end"
+                    type="number"
+                    placeholder="最长停留"
+                    min="0"
+                    aria-label="停留时间最长"
+                  />
+                </div>
+              </UFormField>
+            </div>
+          </section>
+        </div>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-medium">分组配置</h2>
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <div
+            v-if="state.bitBrowser.groups.length === 0"
+            class="text-sm text-gray-500"
+          >
+            暂无分组，请点击下方按钮新增。
+          </div>
+
+          <div
+            v-for="(group, index) in state.bitBrowser.groups"
+            :key="`${group.id || 'new'}-${index}`"
+            class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex flex-col">
+                <span class="text-sm font-medium">分组 {{ index + 1 }}</span>
+                <span class="text-xs text-gray-500">唯一 ID 与并发线程</span>
+              </div>
+              <div class="flex gap-2">
+                <UTooltip text="复制分组" placement="top">
+                  <UButton
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-heroicons-document-duplicate"
+                    @click="duplicateGroup(index)"
+                  />
+                </UTooltip>
+                <UTooltip text="删除分组" placement="top">
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    icon="i-heroicons-trash"
+                    @click="removeGroup(index)"
+                  />
+                </UTooltip>
+              </div>
+            </div>
+
+            <section class="space-y-3">
+              <div>
+                <h3 class="text-sm font-medium text-gray-700">基础信息</h3>
+                <p class="text-xs text-gray-500">
+                  YAML 节点：bit_browser.groups[].(id | threads | inherit)
+                </p>
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField
+                  label="分组 ID"
+                  description="唯一标识，建议使用 UUID。"
+                >
+                  <UInput v-model="group.id" placeholder="例如 4028808b..." />
+                </UFormField>
+
+                <UFormField
+                  label="线程数"
+                  description="并发执行线程数，需为正整数。"
+                >
+                  <UInput
+                    v-model="group.threads"
+                    type="number"
+                    min="1"
+                    placeholder="正整数"
+                  />
+                </UFormField>
+
+                <UFormField
+                  label="继承全局抽奖配置"
+                  description="开启后沿用全局抽奖设置；关闭则完全自定义。"
+                >
+                  <USwitch v-model="group.inherit" />
+                </UFormField>
+              </div>
+            </section>
+
+            <section class="space-y-3">
+              <UDivider label="分组抽奖配置覆盖（可选）" />
+
+              <div>
+                <h3 class="text-sm font-medium text-gray-700">抽奖字段覆盖</h3>
+                <p class="text-xs text-gray-500">
+                  仅填写需要覆盖的字段，留空表示沿用全局 lottery 设置。
+                </p>
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField
+                  label="倒计时范围（秒）"
+                  description="仅当同时填写最小值与最大值时才会覆盖全局设置。"
+                  class="md:col-span-2"
+                >
+                  <div class="flex items-center gap-2">
+                    <UInput
+                      v-model="group.lottery.conditions.countdownRange.start"
+                      type="number"
+                      placeholder="最小秒数"
+                      min="0"
+                      aria-label="分组倒计时最小值"
+                    />
+                    <span class="text-sm text-gray-400">至</span>
+                    <UInput
+                      v-model="group.lottery.conditions.countdownRange.end"
+                      type="number"
+                      placeholder="最大秒数"
+                      min="0"
+                      aria-label="分组倒计时最大值"
+                    />
+                  </div>
+                </UFormField>
+
+                <UFormField
+                  label="最大观众数"
+                  description="留空表示继承全局最大观众数。"
+                >
+                  <UInput
+                    v-model="group.lottery.conditions.maxViewers"
+                    type="number"
+                    placeholder="留空表示继承"
+                    min="0"
+                  />
+                </UFormField>
+
+                <UFormField
+                  label="最低中奖概率 (%)"
+                  description="留空表示继承全局设置。"
+                >
+                  <UInput
+                    v-model="group.lottery.conditions.minProbability"
+                    type="number"
+                    placeholder="留空表示继承"
+                    min="0"
+                    max="100"
+                  />
+                </UFormField>
+
+                <UFormField
+                  label="策略切换阈值 (次)"
+                  description="留空表示继承全局阈值。"
+                >
+                  <UInput
+                    v-model="group.lottery.switchThreshold"
+                    type="number"
+                    placeholder="留空表示继承"
+                    min="0"
+                  />
+                </UFormField>
+
+                <UFormField
+                  label="粉丝团福袋参与"
+                  description="可选择继承、仅此分组参与或不参与粉丝团福袋。"
+                >
+                  <USelect
+                    v-model="group.lottery.fanClub"
+                    :items="groupFanClubOptions"
+                  />
+                </UFormField>
+
+                <UFormField
+                  label="抢袋后停留时间 (秒)"
+                  description="同时填写最短与最长停留秒数才会覆盖全局设置。"
+                  class="md:col-span-2"
+                >
+                  <div class="flex items-center gap-2">
+                    <UInput
+                      v-model="group.lottery.postStay.start"
+                      type="number"
+                      placeholder="最短停留"
+                      min="0"
+                      aria-label="分组停留时间最短"
+                    />
+                    <span class="text-sm text-gray-400">至</span>
+                    <UInput
+                      v-model="group.lottery.postStay.end"
+                      type="number"
+                      placeholder="最长停留"
+                      min="0"
+                      aria-label="分组停留时间最长"
+                    />
+                  </div>
+                </UFormField>
+              </div>
+            </section>
+          </div>
+
+          <div class="flex justify-end">
+            <UButton
+              icon="i-heroicons-plus-circle"
+              variant="ghost"
+              @click="addGroup"
+              >新增分组</UButton
+            >
+          </div>
+        </div>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-medium">Redis 配置</h2>
+          </div>
+        </template>
+
+        <UFormField
+          label="Redis 连接地址"
+          description="格式：redis://host:port/db"
         >
-      </div>
-    </UCard>
-  </div>
-</main>
+          <UInput
+            v-model="state.redis.url"
+            placeholder="redis://127.0.0.1:6379/0"
+          />
+        </UFormField>
+      </UCard>
+    </div>
 
+    <div
+      v-if="showPreview"
+      class="flex flex-col gap-3 lg:sticky lg:top-5 lg:min-w-[320px] lg:w-[360px]"
+    >
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-medium">YAML 预览</h2>
+          </div>
+        </template>
+
+        <div class="space-y-3">
+          <div class="flex gap-3">
+            <UButton
+              icon="i-heroicons-document-duplicate"
+              :disabled="validationMessages.length > 0"
+              @click="handleCopyYaml"
+            >
+              复制 YAML
+            </UButton>
+            <UButton
+              icon="i-heroicons-arrow-down-tray"
+              color="primary"
+              :disabled="validationMessages.length > 0 || isExporting"
+              :loading="isExporting"
+              @click="handleExport"
+            >
+              导出文件
+            </UButton>
+          </div>
+          <pre
+            class="max-h-96 overflow-auto rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
+            >{{ yamlPreview }}
+          </pre>
+        </div>
+      </UCard>
+    </div>
+  </main>
 </template>
