@@ -5,5 +5,11 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vitejs.dev/config
 export default defineConfig({
-  plugins: [vue(), ui(), tailwindcss()],
+  plugins: [
+    vue(),
+    ui({
+      colorMode: false,
+    }),
+    tailwindcss(),
+  ],
 });
