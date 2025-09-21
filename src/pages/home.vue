@@ -4,6 +4,7 @@ import { useToast } from "@nuxt/ui/runtime/composables/useToast.js";
 import z from "zod";
 import { stringify } from "yaml";
 import type { ConfigExportResult } from "../types/config-exporter";
+import { AnimatePresence, motion } from "motion-v";
 
 interface NumericInspectionValid {
   status: "valid";
@@ -1031,42 +1032,47 @@ const duplicateGroup = (index: number) => {
       </UCard>
     </div>
 
-    <div
-      v-if="showPreview"
-      class="flex flex-col gap-3 lg:sticky lg:top-5 lg:min-w-[320px] lg:w-[360px]"
-    >
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-medium">YAML 预览</h2>
-          </div>
-        </template>
+    <AnimatePresence :initial="false">
+      <motion.div
+        v-if="showPreview"
+        class="flex flex-col gap-3 lg:sticky flex-1"
+        :initial="{ opacity: 0, x: 50 }"
+        :animate="{ opacity: 1, x: 0 }"
+      >
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-medium">YAML 预览</h2>
+            </div>
+          </template>
 
-        <div class="space-y-3">
-          <div class="flex gap-3">
-            <UButton
-              icon="i-heroicons-document-duplicate"
-              :disabled="validationMessages.length > 0"
-              @click="handleCopyYaml"
+          <div class="space-y-3">
+            <div class="flex gap-3">
+              <UButton
+                icon="i-heroicons-document-duplicate"
+                :disabled="validationMessages.length > 0"
+                @click="handleCopyYaml"
+              >
+                复制 YAML
+              </UButton>
+              <UButton
+                icon="i-heroicons-arrow-down-tray"
+                color="primary"
+                :disabled="validationMessages.length > 0 || isExporting"
+                :loading="isExporting"
+                @click="handleExport"
+              >
+                导出文件
+              </UButton>
+            </div>
+            <pre
+              class="max-h-96 overflow-auto rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
+              >{{ yamlPreview }}
+          </pre
             >
-              复制 YAML
-            </UButton>
-            <UButton
-              icon="i-heroicons-arrow-down-tray"
-              color="primary"
-              :disabled="validationMessages.length > 0 || isExporting"
-              :loading="isExporting"
-              @click="handleExport"
-            >
-              导出文件
-            </UButton>
           </div>
-          <pre
-            class="max-h-96 overflow-auto rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
-            >{{ yamlPreview }}
-          </pre>
-        </div>
-      </UCard>
-    </div>
+        </UCard>
+      </motion.div>
+    </AnimatePresence>
   </main>
 </template>
