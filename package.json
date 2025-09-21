@@ -34,16 +34,26 @@
     "@electron-forge/plugin-vite": "^7.9.0",
     "@electron-forge/publisher-github": "^7.9.0",
     "@electron/fuses": "^1.8.0",
+    "@tailwindcss/vite": "^4.1.13",
     "@types/electron-squirrel-startup": "^1.0.2",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "@vitejs/plugin-vue": "^6.0.1",
     "electron": "38.1.2",
     "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
-    "typescript": "~4.5.5",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
     "vite": "^5.4.20"
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.1"
+    "@nuxt/ui": "^4.0.0-alpha.2",
+    "@vueuse/core": "^13.9.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "motion-v": "^1.7.1",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.21",
+    "vue-router": "^4.5.1"
   }
 }

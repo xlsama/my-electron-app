@@ -1,15 +1,32 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "commonjs",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "outDir": "dist",
-    "moduleResolution": "node",
-    "resolveJsonModule": true
-  }
+    "lib": ["ESNext", "DOM"],
+    "resolveJsonModule": true,
+    "types": ["node", "vite/client"],
+    "paths": {
+      "#build/ui": ["./node_modules/@nuxt/ui/.nuxt/ui"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "src/**/*.d.ts",
+    "forge.config.ts",
+    "vite.*.config.ts",
+    "vite.*.config.mjs",
+    "forge.env.d.ts",
+    "auto-imports.d.ts",
+    "components.d.ts"
+  ]
 }
