@@ -1,153 +1,102 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import { useToast } from "@nuxt/ui/runtime/composables/useToast.js";
+import { useTemplateRef } from "vue";
 import z from "zod";
 import { stringify } from "yaml";
 import type { ConfigExportResult } from "../types/config-exporter";
 import { AnimatePresence, motion } from "motion-v";
 
-interface NumericInspectionValid {
-  status: "valid";
-  value: number;
-}
+// ---------- Numeric Helpers (Plan A) ----------
+// 语义：requiredNumber —— 必填；optionalNumber —— 可空（空字符串 => undefined）
+//       requiredRange —— 两端必填；optionalRange —— 两端可同时空或同时填
+const preprocessEmptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
 
-interface NumericInspectionInvalid {
-  status: "invalid";
-}
-
-interface NumericInspectionEmpty {
-  status: "empty";
-}
-
-type NumericInspection =
-  | NumericInspectionValid
-  | NumericInspectionInvalid
-  | NumericInspectionEmpty;
-
-const numericField = z.union([z.number(), z.string()]);
-type NumericField = z.infer<typeof numericField>;
-
-const inspectNumeric = (value: NumericField): NumericInspection => {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return { status: "invalid" };
-    }
-
-    return { status: "valid", value };
+const optionalNumber = (
+  cfg: { min?: number; max?: number; integer?: boolean; label?: string } = {}
+) => {
+  const { min, max, integer, label } = cfg;
+  let base = integer ? z.coerce.number() : z.coerce.number();
+  base = base.refine((v) => Number.isFinite(v), {
+    message: `${label || "数值"}需为有效数字`,
+  });
+  if (min !== undefined) {
+    base = base.refine((v) => v >= min, {
+      message: `${label || "数值"}不能小于 ${min}`,
+    });
   }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { status: "empty" };
+  if (max !== undefined) {
+    base = base.refine((v) => v <= max, {
+      message: `${label || "数值"}不能大于 ${max}`,
+    });
   }
-
-  const numeric = Number(trimmed);
-  if (!Number.isFinite(numeric)) {
-    return { status: "invalid" };
+  if (integer) {
+    base = base.refine((v) => Number.isInteger(v), {
+      message: `${label || "数值"}必须为整数`,
+    });
   }
-
-  return { status: "valid", value: numeric };
+  return z.preprocess(preprocessEmptyToUndefined, base.optional());
 };
 
-interface NumericFieldOptions {
-  label: string;
-  min?: number;
-  max?: number;
-  integer?: boolean;
-  required: boolean;
-}
-
-const createNumericField = ({
-  label,
-  min,
-  max,
-  integer,
-  required,
-}: NumericFieldOptions) =>
-  numericField.superRefine((value, ctx) => {
-    const inspection = inspectNumeric(value);
-
-    if (inspection.status === "empty") {
-      if (required) {
-        ctx.addIssue({
-          code: "custom",
-          message: `${label}不能为空`,
-        });
-      }
-      return;
-    }
-
-    if (inspection.status === "invalid") {
-      ctx.addIssue({
-        code: "custom",
-        message: `${label}需要为有效数字`,
-      });
-      return;
-    }
-
-    const numeric = inspection.value;
-
-    if (min !== undefined && numeric < min) {
-      ctx.addIssue({
-        code: "custom",
-        message: `${label}不能小于 ${min}`,
-      });
-    }
-
-    if (max !== undefined && numeric > max) {
-      ctx.addIssue({
-        code: "custom",
-        message: `${label}不能大于 ${max}`,
-      });
-    }
-
-    if (integer && !Number.isInteger(numeric)) {
-      ctx.addIssue({
-        code: "custom",
-        message: `${label}必须为整数`,
-      });
-    }
+const requiredNumber = (
+  label: string,
+  cfg: { min?: number; max?: number; integer?: boolean } = {}
+) => {
+  const { min, max, integer } = cfg;
+  let base = integer ? z.coerce.number() : z.coerce.number();
+  base = base.refine((v) => v !== undefined && Number.isFinite(v), {
+    message: `${label}不能为空`,
   });
+  if (integer) {
+    base = base.refine((v) => Number.isInteger(v), {
+      message: `${label}必须为整数`,
+    });
+  }
+  if (min !== undefined) {
+    base = base.refine((v) => v >= min, { message: `${label}不能小于 ${min}` });
+  }
+  if (max !== undefined) {
+    base = base.refine((v) => v <= max, { message: `${label}不能大于 ${max}` });
+  }
+  return z.preprocess(preprocessEmptyToUndefined, base);
+};
 
-const createRangeField = (label: string, required: boolean) =>
-  z
+const requiredRange = (label: string, cfg: { min?: number } = {}) => {
+  const { min = 0 } = cfg;
+  return z
     .object({
-      start: createNumericField({ label: `${label}最小值`, min: 0, required }),
-      end: createNumericField({ label: `${label}最大值`, min: 0, required }),
+      start: requiredNumber(`${label}最小值`, { min }),
+      end: requiredNumber(`${label}最大值`, { min }),
     })
-    .superRefine((value, ctx) => {
-      const startInspection = inspectNumeric(value.start);
-      const endInspection = inspectNumeric(value.end);
+    .refine((v) => v.start <= v.end, {
+      message: `${label}最小值不能大于最大值`,
+    });
+};
 
-      const hasStartInput = startInspection.status !== "empty";
-      const hasEndInput = endInspection.status !== "empty";
-
-      if (!required && !hasStartInput && !hasEndInput) {
-        return;
-      }
-
-      if (hasStartInput !== hasEndInput) {
+const optionalRange = (label: string, cfg: { min?: number } = {}) => {
+  const { min = 0 } = cfg;
+  return z
+    .object({
+      start: optionalNumber({ min, label: `${label}最小值` }),
+      end: optionalNumber({ min, label: `${label}最大值` }),
+    })
+    .superRefine((v, ctx) => {
+      if (v.start === undefined && v.end === undefined) return; // both empty OK
+      if (v.start === undefined || v.end === undefined) {
         ctx.addIssue({
           code: "custom",
           message: `${label}需要同时填写最小值与最大值`,
         });
         return;
       }
-
-      if (
-        startInspection.status !== "valid" ||
-        endInspection.status !== "valid"
-      ) {
-        return;
-      }
-
-      if (startInspection.value > endInspection.value) {
+      if (v.start > v.end) {
         ctx.addIssue({
           code: "custom",
           message: `${label}最小值不能大于最大值`,
         });
       }
     });
+};
 
 const schema = z.object({
   log: z.object({
@@ -157,60 +106,50 @@ const schema = z.object({
   }),
   lottery: z.object({
     conditions: z.object({
-      countdownRange: createRangeField("全局倒计时范围（秒）", true),
-      maxViewers: createNumericField({
-        label: "最大观众数",
-        min: 0,
-        required: true,
-      }),
-      minProbability: createNumericField({
-        label: "最低中奖概率 (%)",
+      countdownRange: requiredRange("全局倒计时范围（秒）", { min: 0 }),
+      maxViewers: requiredNumber("最大观众数", { min: 0, integer: true }),
+      minProbability: requiredNumber("最低中奖概率 (%)", {
         min: 0,
         max: 100,
-        required: true,
+        integer: true,
       }),
     }),
     fanClub: z.boolean(),
-    switchThreshold: createNumericField({
-      label: "策略切换阈值",
+    switchThreshold: optionalNumber({
       min: 0,
-      required: false,
+      label: "策略切换阈值",
+      integer: true,
     }),
-    postStay: createRangeField("停留时间范围（秒）", true),
+    postStay: requiredRange("停留时间范围（秒）", { min: 0 }),
   }),
   bitBrowser: z.object({
     groups: z.array(
       z.object({
         id: z.string().min(1, "分组 ID 不能为空"),
-        threads: createNumericField({
-          label: "线程数",
-          min: 1,
-          integer: true,
-          required: true,
-        }),
+        threads: requiredNumber("线程数", { min: 1, integer: true }),
         inherit: z.boolean(),
         lottery: z.object({
           conditions: z.object({
-            countdownRange: createRangeField("倒计时范围（秒）", false),
-            maxViewers: createNumericField({
-              label: "最大观众数",
+            countdownRange: optionalRange("倒计时范围（秒）", { min: 0 }),
+            maxViewers: optionalNumber({
               min: 0,
-              required: false,
+              label: "最大观众数",
+              integer: true,
             }),
-            minProbability: createNumericField({
-              label: "最低中奖概率 (%)",
+            minProbability: optionalNumber({
               min: 0,
               max: 100,
-              required: false,
+              label: "最低中奖概率 (%)",
+              integer: true,
             }),
           }),
           fanClub: z.enum(["inherit", "true", "false"]),
-          switchThreshold: createNumericField({
-            label: "策略切换阈值",
+          switchThreshold: optionalNumber({
             min: 0,
-            required: false,
+            label: "策略切换阈值",
+            integer: true,
           }),
-          postStay: createRangeField("停留时间范围（秒）", false),
+          postStay: optionalRange("停留时间范围（秒）", { min: 0 }),
         }),
       })
     ),
@@ -232,27 +171,24 @@ type GroupLotteryForm = GroupForm["lottery"];
 type FanClubSelect = GroupLotteryForm["fanClub"];
 
 const makeRange = (
-  start: RangeField["start"] = "",
-  end: RangeField["end"] = ""
-): RangeField => ({
-  start,
-  end,
-});
+  start: any = undefined,
+  end: any = undefined
+): RangeField => ({ start, end });
 
 const createEmptyConditions = (): LotteryConditionsForm => ({
   countdownRange: makeRange(),
-  maxViewers: "",
-  minProbability: "",
+  maxViewers: undefined as any,
+  minProbability: undefined as any,
 });
 
 const createEmptyGroup = (): GroupForm => ({
   id: "",
-  threads: "",
+  threads: 1,
   inherit: true,
   lottery: {
     conditions: createEmptyConditions(),
     fanClub: "inherit",
-    switchThreshold: "",
+    switchThreshold: undefined as any,
     postStay: makeRange(),
   },
 });
@@ -262,6 +198,14 @@ const toast = useToast();
 const showPreview = ref(true);
 const isExporting = ref(false);
 const exportDefaultFileName = "lottery-config.yaml";
+const isRunningCommand = ref(false);
+const lastCommandResult = ref<null | {
+  code: number | null;
+  signal?: string | null;
+  stdout: string;
+  stderr: string;
+  error?: string;
+}>(null);
 
 const logLevelOptions = [
   { label: "DEBUG", value: "DEBUG" },
@@ -294,7 +238,7 @@ const state = reactive<PageSchema>({
       minProbability: 80,
     },
     fanClub: false,
-    switchThreshold: "",
+    switchThreshold: undefined,
     postStay: makeRange(5, 10),
   },
   bitBrowser: {
@@ -306,7 +250,7 @@ const state = reactive<PageSchema>({
         lottery: {
           conditions: createEmptyConditions(),
           fanClub: "inherit",
-          switchThreshold: "",
+          switchThreshold: undefined,
           postStay: makeRange(),
         },
       },
@@ -328,27 +272,14 @@ const state = reactive<PageSchema>({
   },
 });
 
-const toOptionalNumber = (value: NumericField): number | undefined => {
-  const inspection = inspectNumeric(value);
-  if (inspection.status !== "valid") {
-    return undefined;
-  }
+const toOptionalNumber = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
-  return inspection.value;
-};
-
-const toOptionalRange = (range: RangeField): [number, number] | undefined => {
-  const start = toOptionalNumber(range.start);
-  const end = toOptionalNumber(range.end);
-
-  if (start === undefined && end === undefined) {
-    return undefined;
-  }
-
-  if (start === undefined || end === undefined) {
-    return undefined;
-  }
-
+const toOptionalRange = (range: any): [number, number] | undefined => {
+  const start = toOptionalNumber(range?.start);
+  const end = toOptionalNumber(range?.end);
+  if (start === undefined && end === undefined) return undefined;
+  if (start === undefined || end === undefined) return undefined;
   return [start, end];
 };
 
@@ -454,11 +385,15 @@ const sanitizedConfig = computed(() => {
   if (state.bitBrowser.groups.length > 0) {
     const groups = state.bitBrowser.groups.map((group) => {
       const threads = toOptionalNumber(group.threads);
+      // 线程数最小值在 schema 中已强约束 (min=1)，这里不再做兜底回退逻辑，避免二次判断。
+      // 如果用户当前输入无效，表单校验会阻止导出；预览阶段仅在有效时写入。
       const payload: Record<string, unknown> = {
         id: group.id,
-        threads: threads && threads > 0 ? Math.trunc(threads) : 1,
         inherit: group.inherit,
       };
+      if (threads !== undefined) {
+        payload.threads = Math.trunc(threads);
+      }
 
       const lotteryOverrides = buildGroupLottery(group.lottery);
       if (lotteryOverrides) {
@@ -480,25 +415,40 @@ const yamlPreview = computed(() =>
   stringify(sanitizedConfig.value, { indent: 2 })
 );
 
-const validationMessages = computed(() => {
-  const result = schema.safeParse(state);
-  if (result.success) {
-    return [];
-  }
+// Plan B: rely purely on UForm's internal validation instead of manual schema.safeParse
+// Form exposes an errors ref we can consume for UI state.
+interface FormErrorLike {
+  name?: string;
+  message: string;
+  id?: string;
+}
 
-  return result.error.issues.map((issue) => {
-    if (
-      issue.path[0] === "bitBrowser" &&
-      issue.path[1] === "groups" &&
-      typeof issue.path[2] === "number"
-    ) {
-      const groupIndex = Number(issue.path[2]) + 1;
-      return `分组 ${groupIndex}: ${issue.message}`;
-    }
+// hasErrors / previewErrors now derive from the UForm instance
+const normalizeErrors = (): FormErrorLike[] => {
+  const raw: any = form.value?.errors;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as FormErrorLike[];
+  if (Array.isArray(raw.value)) return raw.value as FormErrorLike[];
+  return [];
+};
+const hasErrors = computed(() => normalizeErrors().length > 0);
+const previewErrors = computed(() =>
+  normalizeErrors()
+    .map((e) => e.message)
+    .slice(0, 5)
+);
 
-    return issue.message;
-  });
-});
+// Form instance ref (if we later want to call form?.validate())
+// Strongly typed form instance ref using useTemplateRef
+// UForm exposes a validate method; we can type minimally for future usage
+interface UFormExpose {
+  validate: (opts?: any) => Promise<any> | any;
+  state: any;
+  errors?: FormErrorLike[] | { value: FormErrorLike[] };
+}
+const form = useTemplateRef<UFormExpose>("form");
+
+// Removed legacy validationMessages manual aggregation; UForm distributes errors automatically via name paths.
 
 const handleCopyYaml = async () => {
   try {
@@ -514,16 +464,22 @@ const handleCopyYaml = async () => {
 };
 
 const handleExport = async () => {
-  if (validationMessages.value.length > 0) {
+  if (isExporting.value) return;
+
+  // Trigger validation through UForm. If validation throws (non-silent), catch and abort.
+  try {
+    await form.value?.validate?.({});
+  } catch {
+    // Errors already populated/displayed by UForm
+  }
+
+  const errorsArr = (form.value?.errors as any)?.value || form.value?.errors;
+  if (errorsArr && errorsArr.length) {
     toast.add({
       title: "导出失败",
       description: "请先修复校验错误后再导出。",
       color: "error",
     });
-    return;
-  }
-
-  if (isExporting.value) {
     return;
   }
 
@@ -537,7 +493,6 @@ const handleExport = async () => {
   }
 
   isExporting.value = true;
-
   try {
     const result: ConfigExportResult = await window.configExporter.exportYaml({
       content: yamlPreview.value,
@@ -552,10 +507,7 @@ const handleExport = async () => {
       });
       return;
     }
-
-    if (result.canceled) {
-      return;
-    }
+    if (result.canceled) return;
 
     toast.add({
       title: "导出成功",
@@ -570,6 +522,69 @@ const handleExport = async () => {
     });
   } finally {
     isExporting.value = false;
+  }
+};
+
+const handleRunCommand = async () => {
+  if (isRunningCommand.value) return;
+  try {
+    // 先执行一次表单校验，避免在无效配置下运行。
+    try {
+      await form.value?.validate?.({});
+    } catch {}
+    const errorsArr = (form.value?.errors as any)?.value || form.value?.errors;
+    if (errorsArr && errorsArr.length) {
+      toast.add({
+        title: "无法执行命令",
+        description: "请先修复校验错误。",
+        color: "error",
+      });
+      return;
+    }
+    if (!window.commandRunner) {
+      toast.add({
+        title: "运行失败",
+        description: "当前环境不支持命令执行。",
+        color: "error",
+      });
+      return;
+    }
+    isRunningCommand.value = true;
+    lastCommandResult.value = null;
+    // 固定执行 date 命令
+    const cmd = "date";
+    const result = await window.commandRunner.run({
+      command: cmd,
+      args: [],
+      timeoutMs: 5000,
+    });
+    lastCommandResult.value = result;
+    if (result.error) {
+      toast.add({
+        title: "命令执行失败",
+        description: result.error,
+        color: "error",
+      });
+    } else {
+      const shortOut =
+        (result.stdout || result.stderr || "(无输出)")
+          .split(/\n/)
+          .filter(Boolean)[0]
+          ?.slice(0, 120) || "(无输出)";
+      toast.add({
+        title: "命令执行完成",
+        description: `${cmd} => ${shortOut}`,
+        color: "success",
+      });
+    }
+  } catch (error) {
+    toast.add({
+      title: "运行失败",
+      description: String(error),
+      color: "error",
+    });
+  } finally {
+    isRunningCommand.value = false;
   }
 };
 
@@ -610,7 +625,13 @@ const duplicateGroup = (index: number) => {
 </script>
 
 <template>
-  <main class="flex flex-col gap-6 lg:flex-row lg:items-start">
+  <!-- Wrap entire configurable area in UForm to leverage Nuxt UI schema validation -->
+  <UForm
+    ref="form"
+    :state="state"
+    :schema="schema"
+    class="flex flex-col gap-6 lg:flex-row lg:items-start"
+  >
     <div class="flex flex-1 flex-col gap-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="space-y-1">
@@ -624,6 +645,7 @@ const duplicateGroup = (index: number) => {
           placement="bottom"
         >
           <UButton
+            type="button"
             variant="ghost"
             color="neutral"
             :icon="
@@ -634,19 +656,6 @@ const duplicateGroup = (index: number) => {
         </UTooltip>
       </div>
 
-      <UAlert
-        v-if="validationMessages.length > 0"
-        title="请先修正以下问题"
-        color="error"
-        variant="subtle"
-      >
-        <ul class="list-disc space-y-1 pl-5 text-sm">
-          <li v-for="message in validationMessages" :key="message">
-            {{ message }}
-          </li>
-        </ul>
-      </UAlert>
-
       <UCard>
         <template #header>
           <div class="flex items-center justify-between">
@@ -655,15 +664,15 @@ const duplicateGroup = (index: number) => {
         </template>
 
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField label="是否禁用日志">
+          <UFormField label="是否禁用日志" name="log.disabled">
             <USwitch v-model="state.log.disabled" />
           </UFormField>
 
-          <UFormField label="日志级别">
+          <UFormField label="日志级别" name="log.level">
             <USelect v-model="state.log.level" :items="logLevelOptions" />
           </UFormField>
 
-          <UFormField label="输出方式">
+          <UFormField label="输出方式" name="log.type">
             <USelect v-model="state.log.type" :items="logTypeOptions" />
           </UFormField>
         </div>
@@ -684,7 +693,14 @@ const duplicateGroup = (index: number) => {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField label="倒计时范围（秒）" class="md:col-span-2">
+              <UFormField
+                label="倒计时范围（秒）"
+                class="md:col-span-2"
+                name="lottery.conditions.countdownRange"
+                :error-pattern="
+                  /(lottery\.conditions\.countdownRange)\.(start|end)/
+                "
+              >
                 <div class="flex items-center gap-2">
                   <UInput
                     v-model="state.lottery.conditions.countdownRange.start"
@@ -704,7 +720,10 @@ const duplicateGroup = (index: number) => {
                 </div>
               </UFormField>
 
-              <UFormField label="最大观众数">
+              <UFormField
+                label="最大观众数"
+                name="lottery.conditions.maxViewers"
+              >
                 <UInput
                   v-model="state.lottery.conditions.maxViewers"
                   type="number"
@@ -713,7 +732,10 @@ const duplicateGroup = (index: number) => {
                 />
               </UFormField>
 
-              <UFormField label="最低中奖概率 (%)">
+              <UFormField
+                label="最低中奖概率 (%)"
+                name="lottery.conditions.minProbability"
+              >
                 <UInput
                   v-model="state.lottery.conditions.minProbability"
                   type="number"
@@ -734,7 +756,10 @@ const duplicateGroup = (index: number) => {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField label="策略切换阈值 (次)">
+              <UFormField
+                label="策略切换阈值 (次)"
+                name="lottery.switchThreshold"
+              >
                 <UInput
                   v-model="state.lottery.switchThreshold"
                   type="number"
@@ -743,7 +768,7 @@ const duplicateGroup = (index: number) => {
                 />
               </UFormField>
 
-              <UFormField label="粉丝团福袋参与">
+              <UFormField label="粉丝团福袋参与" name="lottery.fanClub">
                 <USwitch v-model="state.lottery.fanClub" />
               </UFormField>
             </div>
@@ -756,7 +781,12 @@ const duplicateGroup = (index: number) => {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField label="抢袋后停留时间 (秒)" class="md:col-span-2">
+              <UFormField
+                label="抢袋后停留时间 (秒)"
+                class="md:col-span-2"
+                name="lottery.postStay"
+                :error-pattern="/(lottery\.postStay)\.(start|end)/"
+              >
                 <div class="flex items-center gap-2">
                   <UInput
                     v-model="state.lottery.postStay.start"
@@ -808,6 +838,7 @@ const duplicateGroup = (index: number) => {
               <div class="flex gap-2">
                 <UTooltip text="复制分组" placement="top">
                   <UButton
+                    type="button"
                     size="xs"
                     color="neutral"
                     variant="ghost"
@@ -817,6 +848,7 @@ const duplicateGroup = (index: number) => {
                 </UTooltip>
                 <UTooltip text="删除分组" placement="top">
                   <UButton
+                    type="button"
                     size="xs"
                     color="error"
                     variant="ghost"
@@ -836,11 +868,17 @@ const duplicateGroup = (index: number) => {
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
-                <UFormField label="分组 ID">
+                <UFormField
+                  :label="'分组 ID'"
+                  :name="`bitBrowser.groups.${index}.id`"
+                >
                   <UInput v-model="group.id" placeholder="例如 4028808b..." />
                 </UFormField>
 
-                <UFormField label="线程数">
+                <UFormField
+                  label="线程数"
+                  :name="`bitBrowser.groups.${index}.threads`"
+                >
                   <UInput
                     v-model="group.threads"
                     type="number"
@@ -849,7 +887,10 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField label="继承全局抽奖配置">
+                <UFormField
+                  label="继承全局抽奖配置"
+                  :name="`bitBrowser.groups.${index}.inherit`"
+                >
                   <USwitch v-model="group.inherit" />
                 </UFormField>
               </div>
@@ -866,7 +907,16 @@ const duplicateGroup = (index: number) => {
               </div>
 
               <div class="grid gap-4 md:grid-cols-2">
-                <UFormField label="倒计时范围（秒）" class="md:col-span-2">
+                <UFormField
+                  label="倒计时范围（秒）"
+                  class="md:col-span-2"
+                  :name="`bitBrowser.groups.${index}.lottery.conditions.countdownRange`"
+                  :error-pattern="
+                    new RegExp(
+                      `(bitBrowser\\.groups\\.${index}\\.lottery\\.conditions\\.countdownRange)\\.(start|end)`
+                    )
+                  "
+                >
                   <div class="flex items-center gap-2">
                     <UInput
                       v-model="group.lottery.conditions.countdownRange.start"
@@ -886,7 +936,10 @@ const duplicateGroup = (index: number) => {
                   </div>
                 </UFormField>
 
-                <UFormField label="最大观众数">
+                <UFormField
+                  label="最大观众数"
+                  :name="`bitBrowser.groups.${index}.lottery.conditions.maxViewers`"
+                >
                   <UInput
                     v-model="group.lottery.conditions.maxViewers"
                     type="number"
@@ -895,7 +948,10 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField label="最低中奖概率 (%)">
+                <UFormField
+                  label="最低中奖概率 (%)"
+                  :name="`bitBrowser.groups.${index}.lottery.conditions.minProbability`"
+                >
                   <UInput
                     v-model="group.lottery.conditions.minProbability"
                     type="number"
@@ -905,7 +961,10 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField label="策略切换阈值 (次)">
+                <UFormField
+                  label="策略切换阈值 (次)"
+                  :name="`bitBrowser.groups.${index}.lottery.switchThreshold`"
+                >
                   <UInput
                     v-model="group.lottery.switchThreshold"
                     type="number"
@@ -914,14 +973,26 @@ const duplicateGroup = (index: number) => {
                   />
                 </UFormField>
 
-                <UFormField label="粉丝团福袋参与">
+                <UFormField
+                  label="粉丝团福袋参与"
+                  :name="`bitBrowser.groups.${index}.lottery.fanClub`"
+                >
                   <USelect
                     v-model="group.lottery.fanClub"
                     :items="groupFanClubOptions"
                   />
                 </UFormField>
 
-                <UFormField label="抢袋后停留时间 (秒)" class="md:col-span-2">
+                <UFormField
+                  label="抢袋后停留时间 (秒)"
+                  class="md:col-span-2"
+                  :name="`bitBrowser.groups.${index}.lottery.postStay`"
+                  :error-pattern="
+                    new RegExp(
+                      `(bitBrowser\\.groups\\.${index}\\.lottery\\.postStay)\\.(start|end)`
+                    )
+                  "
+                >
                   <div class="flex items-center gap-2">
                     <UInput
                       v-model="group.lottery.postStay.start"
@@ -946,6 +1017,7 @@ const duplicateGroup = (index: number) => {
 
           <div class="flex justify-end">
             <UButton
+              type="button"
               icon="i-heroicons-plus-circle"
               variant="ghost"
               @click="addGroup"
@@ -962,7 +1034,7 @@ const duplicateGroup = (index: number) => {
           </div>
         </template>
 
-        <UFormField label="Redis 连接地址">
+        <UFormField label="Redis 连接地址" name="redis.url">
           <UInput
             v-model="state.redis.url"
             placeholder="redis://127.0.0.1:6379/0"
@@ -988,21 +1060,69 @@ const duplicateGroup = (index: number) => {
           <div class="space-y-3">
             <div class="flex gap-3">
               <UButton
+                type="button"
                 icon="i-heroicons-document-duplicate"
-                :disabled="validationMessages.length > 0"
+                :disabled="hasErrors"
                 @click="handleCopyYaml"
               >
                 复制 YAML
               </UButton>
               <UButton
+                type="button"
                 icon="i-heroicons-arrow-down-tray"
                 color="primary"
-                :disabled="validationMessages.length > 0 || isExporting"
+                :disabled="hasErrors || isExporting"
                 :loading="isExporting"
                 @click="handleExport"
               >
                 导出文件
               </UButton>
+              <UButton
+                type="button"
+                icon="i-lucide-terminal"
+                color="neutral"
+                :disabled="hasErrors || isRunningCommand"
+                :loading="isRunningCommand"
+                @click="handleRunCommand"
+              >
+                运行命令
+              </UButton>
+            </div>
+            <UAlert
+              v-if="hasErrors"
+              color="error"
+              icon="i-lucide-alert-triangle"
+              title="存在未通过校验的字段"
+              :description="previewErrors.join('\n')"
+              class="whitespace-pre-line"
+            />
+            <div
+              v-if="lastCommandResult"
+              class="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-700 space-y-1"
+            >
+              <div class="font-medium">最近一次命令输出</div>
+              <div>
+                exit: {{ lastCommandResult.code }}
+                {{
+                  lastCommandResult.signal
+                    ? "(" + lastCommandResult.signal + ")"
+                    : ""
+                }}
+              </div>
+              <div v-if="lastCommandResult.error" class="text-red-600">
+                error: {{ lastCommandResult.error }}
+              </div>
+              <pre
+                v-if="lastCommandResult.stdout"
+                class="overflow-x-auto whitespace-pre-wrap"
+                >{{ lastCommandResult.stdout }}</pre
+              >
+              <pre
+                v-else-if="lastCommandResult.stderr"
+                class="overflow-x-auto whitespace-pre-wrap"
+                >{{ lastCommandResult.stderr }}</pre
+              >
+              <div v-else class="italic text-gray-400">(无输出)</div>
             </div>
             <pre
               class="rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
@@ -1013,5 +1133,5 @@ const duplicateGroup = (index: number) => {
         </UCard>
       </motion.div>
     </AnimatePresence>
-  </main>
+  </UForm>
 </template>
