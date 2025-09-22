@@ -718,11 +718,6 @@ watch(
 
         <div class="space-y-6">
           <section class="space-y-3">
-            <div
-              v-html="highlightedYamlHtml"
-              class="rounded border border-default text-sm overflow-x-auto"
-            />
-
             <div class="grid gap-4 md:grid-cols-2">
               <UFormField
                 label="倒计时范围（秒）"
