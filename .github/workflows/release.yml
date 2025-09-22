@@ -1,17 +1,30 @@
 name: build-and-release
 
 on:
+  # 手动触发（备用）
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release tag (e.g. v1.0.0)"
+        description: "Release tag (e.g. v1.2.3)"
         required: true
+        type: string
+      release_name:
+        description: "Release title (optional)"
+        required: false
         type: string
       prerelease:
         description: "Mark as prerelease"
         required: false
         type: boolean
         default: false
+  # 仅在推送符合版本格式的 tag 时触发（bumpp 已负责创建并推送 tag）
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -78,20 +91,33 @@ jobs:
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
-
       - name: Display downloaded files
         run: ls -R
-
+      - name: Release metadata
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.tag_name }}"
+            name="${{ github.event.inputs.release_name }}"
+            [ -z "$name" ] && name="Release $tag"
+            pre=${{ github.event.inputs.prerelease || false }}
+          else
+            tag="${GITHUB_REF_NAME}"  # e.g. v1.2.3
+            name="Release $tag"
+            if [[ $tag == *-* ]]; then pre=true; else pre=false; fi
+          fi
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "name=$name" >> $GITHUB_OUTPUT
+          echo "prerelease=$pre" >> $GITHUB_OUTPUT
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             macos-artifacts/**
             windows-artifacts/**
-          tag_name: ${{ github.event.inputs.tag_name }}
-          name: ${{ github.event.inputs.release_name }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
           draft: false
-          prerelease: ${{ github.event.inputs.prerelease || false }}
-          target_commitish: ${{ github.sha }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
