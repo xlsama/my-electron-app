@@ -99,7 +99,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             tag="${{ github.event.inputs.tag_name }}"
             name="${{ github.event.inputs.release_name }}"
-            [ -z "$name" ] && name="Release $tag"
+            [ -z "$name" ] && name="$tag"
             pre=${{ github.event.inputs.prerelease || false }}
           else
             tag="${GITHUB_REF_NAME}"  # e.g. v1.2.3
