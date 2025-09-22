@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useToast } from "@nuxt/ui/runtime/composables/useToast.js";
 import { useTemplateRef } from "vue";
 import z from "zod";
 import { stringify } from "yaml";
 import type { ConfigExportResult } from "../types/config-exporter";
 import { AnimatePresence, motion } from "motion-v";
+import { codeToHtml } from "shiki";
 
 // ---------- Numeric Helpers (Plan A) ----------
 // 语义：requiredNumber —— 必填；optionalNumber —— 可空（空字符串 => undefined）
@@ -622,6 +623,36 @@ const duplicateGroup = (index: number) => {
   const original = state.bitBrowser.groups[index];
   state.bitBrowser.groups.splice(index + 1, 0, cloneGroup(original));
 };
+
+// YAML 语法高亮逻辑（Shiki）
+// 使用递增序列号代替 onCleanup + flag，确保仅最后一次异步结果生效。
+const highlightedYamlHtml = ref("");
+let highlightRequestSeq = 0; // 单调递增的高亮请求序号
+
+const SHIKI_YAML_OPTIONS = Object.freeze({
+  lang: "yaml",
+  theme: "catppuccin-latte",
+});
+
+watch(
+  yamlPreview,
+  async (code) => {
+    const seq = ++highlightRequestSeq;
+    try {
+      // 立即给出一个轻量的占位（可选）——如果不需要占位可移除下面一行。
+      // highlightedYamlHtml.value = '<pre class="opacity-50">渲染中...</pre>';
+      const out = await codeToHtml(code, SHIKI_YAML_OPTIONS as any);
+      if (seq === highlightRequestSeq) {
+        highlightedYamlHtml.value = out;
+      }
+    } catch (e) {
+      if (seq === highlightRequestSeq) {
+        highlightedYamlHtml.value = `<pre class="text-red-500">高亮失败：${String(e)}</pre>`;
+      }
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -687,10 +718,10 @@ const duplicateGroup = (index: number) => {
 
         <div class="space-y-6">
           <section class="space-y-3">
-            <div>
-              <h3 class="text-sm font-medium text-gray-700">基础过滤条件</h3>
-              <p class="text-xs text-gray-500">YAML 节点：lottery.conditions</p>
-            </div>
+            <div
+              v-html="highlightedYamlHtml"
+              class="rounded border border-default text-sm overflow-x-auto"
+            />
 
             <div class="grid gap-4 md:grid-cols-2">
               <UFormField
@@ -1124,14 +1155,28 @@ const duplicateGroup = (index: number) => {
               >
               <div v-else class="italic text-gray-400">(无输出)</div>
             </div>
-            <pre
-              class="rounded border border-gray-200 bg-gray-900 p-4 text-sm text-gray-100"
-              >{{ yamlPreview }}
-          </pre
-            >
+            <!-- Highlighted YAML (Shiki) -->
+            <div
+              v-html="highlightedYamlHtml"
+              class="rounded border border-default text-sm overflow-x-auto"
+            />
           </div>
         </UCard>
       </motion.div>
     </AnimatePresence>
   </UForm>
 </template>
+
+<style scoped>
+/* 仅作用于高亮预览容器内的 Shiki 代码块（不依赖字符串替换，避免未来结构变化失效） */
+.border.border-default :deep(pre.shiki) {
+  padding: 1rem; /* 与 Tailwind p-4 等价 */
+  margin: 0;
+  background: transparent; /* 保持外层卡片背景一致 */
+}
+/* 若主题里已有内边距，可通过下面的选择器覆盖去重（示例演示，可按需删除） */
+.border.border-default :deep(pre.shiki code) {
+  line-height: 1.5;
+  font-size: 0.875rem; /* text-sm */
+}
+</style>

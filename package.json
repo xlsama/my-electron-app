@@ -45,6 +45,7 @@
     "eslint": "^8.57.1",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
+    "shiki": "^3.13.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^5.4.20"
